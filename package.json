@@ -1,9 +1,14 @@
 {
   "dependencies": {
     "bcrypt": "^5.1.1",
+    "color-name-list": "^11.5.0",
+    "color-namer": "^1.4.0",
+    "colornames": "^1.1.1",
+    "csv-parser": "^3.2.0",
     "ejs": "^3.1.10",
     "express": "^4.21.2",
     "mongoose": "^8.9.5",
+    "multer": "^1.4.5-lts.1",
     "nodemon": "^3.1.9",
     "path": "^0.12.7"
   }

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detect Color & Dress Type</title>
+    <style>
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .color-box {
+            width: 120px;
+            height: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            border-radius: 5px;
+            border: 1px solid #000;
+            padding: 5px;
+            font-size: 12px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .top-half {
+            height: 50%;
+            width: 100%;
+        }
+        .bottom-half {
+            height: 50%;
+            width: 100%;
+        }
+        .product-container {
+            margin-top: 20px;
+        }
+        .product-item {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h2>Click on the Image to Detect Color</h2>
+    <img id="uploadedImage" src="/uploads/<%= image %>" style="width: 500px; cursor: crosshair;">
+
+    <p>Detected Color: <span id="colorName">None</span> (<span id="colorHex">#000000</span>)</p>
+    <p>Detected Dress Type: <span id="dressType">Detecting...</span></p>
+
+    <p>Matching Colors:</p>
+    <div id="matchColorContainer" class="container"></div>
+
+    <h2>Recommended Matches</h2>
+    <div id="productContainer" class="product-container"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const uploadedImage = document.getElementById("uploadedImage");
+            const matchColorContainer = document.getElementById("matchColorContainer");
+            const productContainer = document.getElementById("productContainer");
+
+            let detectedDressType = "Unknown";
+
+            uploadedImage.addEventListener("click", function(event) {
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d");
+
+                canvas.width = uploadedImage.width;
+                canvas.height = uploadedImage.height;
+                ctx.drawImage(uploadedImage, 0, 0, uploadedImage.width, uploadedImage.height);
+
+                const rect = uploadedImage.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+
+                const pixelData = ctx.getImageData(x, y, 1, 1).data;
+                const [r, g, b] = [pixelData[0], pixelData[1], pixelData[2]];
+
+                fetch('/getColor', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ r, g, b })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("colorName").innerText = data.detected.name;
+                    document.getElementById("colorHex").innerText = data.detected.hex;
+                    document.getElementById("colorHex").style.color = data.detected.hex;
+
+                    // Update Matching Colors List
+                    matchColorContainer.innerHTML = ""; 
+                    data.match.forEach(color => {
+                        const colorDiv = document.createElement("div");
+                        colorDiv.className = "color-box";
+                        colorDiv.innerHTML = `
+                            <div class="top-half" style="background-color: ${data.detected.hex};"></div>
+                            <div class="bottom-half" style="background-color: ${color.hex};"></div>
+                            ${color.name} (${color.hex})
+                        `;
+                        colorDiv.style.color = (parseInt(color.hex.replace("#", ""), 16) > 0xffffff / 2) ? 'black' : 'white';
+
+                        colorDiv.addEventListener("click", function() {
+                            fetch(`/getDress?color=${encodeURIComponent(color.hex)}&dressType=${detectedDressType}`)
+                                .then(response => response.json())
+                                .then(products => {
+                                    productContainer.innerHTML = products.map(p => `
+                                        <div class="product-item">
+                                            <p><strong>${p.name}</strong></p>
+                                            <p>Price: ₹${p.price}</p>
+                                            <a href="${p.url}" target="_blank">View on Amazon</a>
+                                        </div>
+                                    `).join('');
+                                });
+                        });
+
+                        matchColorContainer.appendChild(colorDiv);
+                    });
+
+                    // Get Dress Type
+                    fetch(`/getDressType?image=<%= image %>`)
+                        .then(response => response.json())
+                        .then(dressData => {
+                            detectedDressType = dressData.dressType;
+                            document.getElementById("dressType").innerText = dressData.dressType;
+                        });
+                })
+                .catch(err => console.error(err));
+            });
+        });
+        <div id="amazon-results">
+    <h3>Matching Products on Amazon</h3>
+    <ul id="product-list"></ul>
+</div>
+
+    function fetchAmazonResults() {
+        const color = "<%= detectedColor %>"; // Now correctly passed from backend
+        const dressType = "<%= dressType %>"; // Now correctly passed from backend
+
+        fetch(`/getAmazonResults?color=${color}&dressType=${dressType}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById("amazon-results").innerHTML = `<p>${data.error}</p>`;
+                    return;
+                }
+
+                const productList = document.getElementById("product-list");
+                productList.innerHTML = "";
+
+                data.products.forEach(product => {
+                    const listItem = document.createElement("li");
+                    listItem.innerHTML = `<a href="${product.url}" target="_blank">${product.name} - ${product.price}</a>`;
+                    productList.appendChild(listItem);
+                });
+            })
+            .catch(error => console.error("Error fetching Amazon results:", error));
+    }
+
+    fetchAmazonResults();
+    </script>
+</body>
+</html>

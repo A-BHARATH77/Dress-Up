@@ -2,7 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import sys
 sys.stdout.reconfigure(encoding='utf-8')
-from image_labelling import get_dress_type
+from detect_dress import get_dress_type
 
 # Get user input for color and type of dress
 dress_type = get_dress_type()

@@ -1,0 +1,116 @@
+properly working detect.ejs
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detect Color & Dress Type</title>
+    <style>
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .color-box {
+            width: 120px;
+            height: 120px;
+            display: flex;
+            flex-direction: column;
+            border-radius: 5px;
+            border: 1px solid #000;
+            font-size: 12px;
+            text-align: center;
+            overflow: hidden;
+        }
+        .top-half {
+            height: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        .bottom-half {
+            height: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h2>Click on the Image to Detect Color</h2>
+    <img id="uploadedImage" src="/uploads/<%= image %>" style="width: 500px; cursor: crosshair;">
+
+    <p>Detected Color: <span id="colorName">None</span> (<span id="colorHex">#000000</span>)</p>
+    <p>Matching Colors:</p>
+    <div id="matchColorContainer" class="container"></div>
+
+    <p>Detected Dress Type: <span id="dressType">Detecting...</span></p>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const uploadedImage = document.getElementById("uploadedImage");
+            const matchColorContainer = document.getElementById("matchColorContainer");
+
+            uploadedImage.addEventListener("click", function(event) {
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d");
+
+                canvas.width = uploadedImage.width;
+                canvas.height = uploadedImage.height;
+                ctx.drawImage(uploadedImage, 0, 0, uploadedImage.width, uploadedImage.height);
+
+                const rect = uploadedImage.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+
+                const pixelData = ctx.getImageData(x, y, 1, 1).data;
+                const [r, g, b] = [pixelData[0], pixelData[1], pixelData[2]];
+
+                fetch('/getColor', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ r, g, b })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Update Detected Color
+                    document.getElementById("colorName").innerText = data.detected.name;
+                    document.getElementById("colorHex").innerText = data.detected.hex;
+                    document.getElementById("colorHex").style.color = data.detected.hex;
+
+                    // Update Matching Colors List
+                    matchColorContainer.innerHTML = ""; // Clear previous colors
+                    data.match.forEach(color => {
+                        const colorDiv = document.createElement("div");
+                        colorDiv.className = "color-box";
+
+                        // Create Top Half (Detected Color)
+                        const topHalf = document.createElement("div");
+                        topHalf.className = "top-half";
+                        topHalf.style.backgroundColor = data.detected.hex;
+                        topHalf.style.color = (parseInt(data.detected.hex.replace("#", ""), 16) > 0xffffff / 2) ? 'black' : 'white';
+                        topHalf.innerText = data.detected.name;
+
+                        // Create Bottom Half (Matching Color)
+                        const bottomHalf = document.createElement("div");
+                        bottomHalf.className = "bottom-half";
+                        bottomHalf.style.backgroundColor = color.hex;
+                        bottomHalf.style.color = (parseInt(color.hex.replace("#", ""), 16) > 0xffffff / 2) ? 'black' : 'white';
+                        bottomHalf.innerText = color.name;
+
+                        // Append halves to box
+                        colorDiv.appendChild(topHalf);
+                        colorDiv.appendChild(bottomHalf);
+                        matchColorContainer.appendChild(colorDiv);
+                    });
+                })
+                .catch(err => console.error(err));
+            });
+        });
+    </script>
+</body>
+</html>
